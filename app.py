@@ -1,8 +1,7 @@
 # ==============================================================================
 #                      Bangla Semantic Search Engine - app.py
-#           (Version with Dynamic Pagination and No AI Explanation)
+#                (Version with Hybrid and Exact Match Search Modes)
 # ==============================================================================
-
 import os
 import sys
 import ast
@@ -10,20 +9,20 @@ import math
 from itertools import groupby
 from flask import Flask, render_template, request
 
-# --- Import Core Libraries ---
+# --- Import Core Libraries (Unchanged) ---
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain.schema import Document
 from rank_bm25 import BM25Okapi
 
 # ==============================================================================
-#                      1. ONE-TIME INITIALIZATION
+#                      1. ONE-TIME INITIALIZATION (Unchanged)
 # ==============================================================================
-
+# (This entire section is the same as the previous version. It loads the models
+# and processes the text file into document chunks for BM25)
 print("===================================================")
 print("Starting Flask server and loading pre-built models...")
-print("===================================================")
-
+# ... [same initialization code as before] ...
 # --- Initialize Flask App ---
 app = Flask(__name__)
 
@@ -32,7 +31,6 @@ DATA_FILE_PATH = "quran_text.txt"
 EMBEDDING_MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
 FAISS_INDEX_PATH = "faiss_index_bangla"
 CHUNK_SIZE_IN_VERSES = 3
-# ** RESULTS_PER_PAGE constant is now removed, as it's dynamic **
 
 # --- Load documents for BM25 search (Unchanged) ---
 print(f"-> Loading document text for keyword search...")
@@ -81,11 +79,13 @@ else: bm25 = None
 
 print("===================================================")
 print("           Initialization Complete                 ")
-print("===================================================")
+# ==============================================================================
+
 
 # ==============================================================================
-#                  2. HYBRID SEARCH FUNCTION (Unchanged)
+#                  2. SEARCH FUNCTIONS (UPDATED)
 # ==============================================================================
+
 def perform_hybrid_search(query):
     # This function remains the same as the previous version
     if not vector_store or not bm25: return []
@@ -96,8 +96,7 @@ def perform_hybrid_search(query):
     bm25_results = [(documents[i], bm25_scores[i]) for i in top_n_bm25_indices]
     
     def reciprocal_rank_fusion(results_lists, k=60):
-        fused_scores = {}
-        doc_map = {doc.page_content: doc for results in results_lists for doc, _ in results}
+        fused_scores, doc_map = {}, {doc.page_content: doc for results in results_lists for doc, _ in results}
         for results in results_lists:
             for rank, (doc, score) in enumerate(results):
                 doc_content = doc.page_content
@@ -110,49 +109,76 @@ def perform_hybrid_search(query):
     MIN_CHUNK_LENGTH_CHARS = 50 
     return [doc for doc in fused_results if len(doc.page_content) > MIN_CHUNK_LENGTH_CHARS]
 
+# ** NEW FUNCTION FOR EXACT MATCH SEARCH **
+def perform_exact_search(query):
+    """
+    Performs a keyword-only (BM25) search and returns results that contain
+    the keywords.
+    """
+    if not bm25: return []
+    
+    tokenized_query = query.split()
+    bm25_scores = bm25.get_scores(tokenized_query)
+    
+    # Get all documents with a score greater than 0 (meaning at least one keyword matched)
+    matching_docs_with_scores = []
+    for i, score in enumerate(bm25_scores):
+        if score > 0:
+            matching_docs_with_scores.append((documents[i], score))
+    
+    # Sort the matching documents by their score in descending order
+    sorted_exact_results = sorted(matching_docs_with_scores, key=lambda item: item[1], reverse=True)
+    
+    # Extract just the document objects from the sorted list
+    all_relevant_docs = [doc for doc, score in sorted_exact_results]
+    
+    # Filter out any potential short results
+    MIN_CHUNK_LENGTH_CHARS = 50 
+    return [doc for doc in all_relevant_docs if len(doc.page_content) > MIN_CHUNK_LENGTH_CHARS]
+
+
 # ==============================================================================
-#          3. FLASK WEB ROUTES (UPDATED WITH DYNAMIC PER_PAGE LOGIC)
+#                  3. FLASK WEB ROUTES (UPDATED)
 # ==============================================================================
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    # --- Get parameters from the request ---
+    # --- Determine search parameters from the request ---
     if request.method == 'POST':
-        # This is a new search submitted from the form
         query = request.form.get('query', '').strip()
-        per_page = request.form.get('per_page', 20, type=int) # Get from form
-        page = 1 # A new search always starts at page 1
-    else:
-        # This is a GET request, for navigating pages of a previous search
+        per_page = request.form.get('per_page', 20, type=int)
+        # Determine which button was clicked ('hybrid' or 'exact')
+        search_type = request.form.get('search_type', 'hybrid') 
+        page = 1
+    else: # GET request for pagination
         query = request.args.get('query', '').strip()
-        per_page = request.args.get('per_page', 20, type=int) # Get from URL
+        per_page = request.args.get('per_page', 20, type=int)
+        search_type = request.args.get('search_type', 'hybrid')
         page = request.args.get('page', 1, type=int)
 
-    # --- Perform search if a query exists ---
+    # --- Perform the chosen search if a query exists ---
     if query:
-        print(f"Handling search for '{query}', page {page}, {per_page} per page")
-        all_results = perform_hybrid_search(query)
+        print(f"Handling search for '{query}' | Type: {search_type} | Page: {page}")
         
-        # --- Pagination Calculations using the dynamic per_page value ---
+        if search_type == 'exact':
+            all_results = perform_exact_search(query)
+        else: # Default to hybrid search
+            all_results = perform_hybrid_search(query)
+        
+        # --- Pagination Calculations ---
         total_results = len(all_results)
         total_pages = math.ceil(total_results / per_page)
         start_index = (page - 1) * per_page
         end_index = start_index + per_page
-        
         results_for_page = all_results[start_index:end_index]
         
-        # Create a pagination object to pass to the template
         pagination = {
-            'page': page,
-            'per_page': per_page, # Pass the current per_page setting
-            'total_pages': total_pages,
-            'total_results': total_results,
-            'has_prev': page > 1,
-            'has_next': page < total_pages,
-            'results': results_for_page
+            'page': page, 'per_page': per_page, 'total_pages': total_pages,
+            'total_results': total_results, 'has_prev': page > 1,
+            'has_next': page < total_pages, 'results': results_for_page
         }
-        return render_template('index.html', query=query, pagination=pagination)
+        # Pass search_type back to the template to build correct pagination links
+        return render_template('index.html', query=query, pagination=pagination, search_type=search_type)
 
-    # Render the home page without any search results
     return render_template('index.html', query=None, pagination=None)
 
 

@@ -28,7 +28,8 @@
                 <option value="100" {% if pagination and pagination.per_page == 100 %}selected{% endif %}>100 টি ফলাফল</option>
             </select>
             
-            <button type="submit">অনুসন্ধান করুন</button>
+            <button type="submit" name="search_type" value="hybrid" class="btn-primary">অনুসন্ধান করুন</button>
+            <button type="submit" name="search_type" value="exact" class="btn-secondary">এক্সাক্ট ম্যাচ অনুসন্ধান</button>
         </form>
 
         {% if pagination %}
@@ -56,7 +57,7 @@
             <nav class="pagination-controls">
                 <ul>
                     {% if pagination.has_prev %}
-                        <li><a href="{{ url_for('index', query=query, page=pagination.page - 1, per_page=pagination.per_page) }}">&laquo; পূর্ববর্তী</a></li>
+                        <li><a href="{{ url_for('index', query=query, page=pagination.page - 1, per_page=pagination.per_page, search_type=search_type) }}">&laquo; পূর্ববর্তী</a></li>
                     {% else %}
                         <li class="disabled"><span>&laquo; পূর্ববর্তী</span></li>
                     {% endif %}
@@ -65,12 +66,12 @@
                         {% if page_num == pagination.page %}
                             <li class="active"><span>{{ page_num }}</span></li>
                         {% elif page_num > pagination.page - 3 and page_num < pagination.page + 3 %}
-                            <li><a href="{{ url_for('index', query=query, page=page_num, per_page=pagination.per_page) }}">{{ page_num }}</a></li>
+                            <li><a href="{{ url_for('index', query=query, page=page_num, per_page=pagination.per_page, search_type=search_type) }}">{{ page_num }}</a></li>
                         {% endif %}
                     {% endfor %}
 
                     {% if pagination.has_next %}
-                        <li><a href="{{ url_for('index', query=query, page=pagination.page + 1, per_page=pagination.per_page) }}">পরবর্তী &raquo;</a></li>
+                        <li><a href="{{ url_for('index', query=query, page=pagination.page + 1, per_page=pagination.per_page, search_type=search_type) }}">পরবর্তী &raquo;</a></li>
                     {% else %}
                         <li class="disabled"><span>পরবর্তী &raquo;</span></li>
                     {% endif %}
