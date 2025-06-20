@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bangla Document Search</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>বাংলা ডকুমেন্ট এআই সার্চ</h1>
+        <p>আপনার সম্পূর্ণ ডকুমেন্টের মধ্যে প্রাসঙ্গিক তথ্য অনুসন্ধান করুন।</p>
+        
+        <form action="/" method="POST" class="search-form">
+            <input type="text" name="query" placeholder="এখানে আপনার প্রশ্ন লিখুন..." required>
+            <button type="submit">অনুসন্ধান করুন</button>
+        </form>
+
+        {% if results %}
+        <div class="results-container">
+            <h2>"{{ results.query }}" এর জন্য ফলাফল:</h2>
+            
+            <div class="explanation-box">
+                <h3>সারসংক্ষেপ (AI দ্বারা তৈরি):</h3>
+                <p>{{ results.explanation | safe }}</p>
+            </div>
+
+            <div class="source-docs">
+                <h3>প্রাসঙ্গিক ডকুমেন্ট অংশ:</h3>
+                {% for doc in results.results %}
+                <div class="doc-chunk">
+                    <div class="doc-metadata">
+                        <strong>উৎস: সূরা {{ doc.metadata.surah }}, আয়াত {{ doc.metadata.ayah_range }}</strong>
+                    </div>
+                    <p>{{ doc.page_content }}</p>
+                </div>
+                <hr>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
