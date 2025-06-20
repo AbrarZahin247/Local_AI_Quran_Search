@@ -4,7 +4,7 @@ This project is a fully local, AI-powered search engine for exploring the Holy Q
 
 The entire system runs on your local machine, ensuring 100% privacy.
 
-![Application Screenshot](app_screenshot.png)
+![Application Screenshot](app_screenshot.PNG)
 *(This screenshot shows the main user interface of the application.)*
 
 ## Features
